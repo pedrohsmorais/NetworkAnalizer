@@ -3,7 +3,9 @@ import os
 from datetime import datetime
 import time
 import matplotlib.pyplot as plt
-from scapy.all import AsyncSniffer
+from scapy.all import AsyncSniffer, IP, ICMP
+from scapy.sendrecv import sr1
+
 
 class User:
     def __init__(self, username, password):
@@ -15,7 +17,6 @@ class User:
         username = input("Digite seu nome de usuário: ")
         password = input("Digite sua senha: ")
 
-        # Verificar se o usuário já está cadastrado no arquivo de usuários
         if User.foi_registrado(username):
             user = User(username, password)
             print(f'Bem vindo {user.username}!')
@@ -34,12 +35,11 @@ class User:
             return User.cria_novo_user()
 
     @staticmethod
-    def foi_registrado(username):
+    def foi_registrado(username, __password):
         users = User.carrega_users()
 
-        # Verificar se o usuário existe na lista de usuários
         for user in users:
-            if user["username"] == username:
+            if user["username"] == username and user["password"] == __password:
                 return True
 
         return False
@@ -89,11 +89,13 @@ class NetworkAnalyzer:
             self.sniffer = None
             self._start_time = 0
             self._end_time = 0
+            self.use_shortcuts = 0
         else:
             raise TypeError("Falha no login. Impossível criar instância de NetworkAnalyzer.")
 
 
     def start_packet_capture(self):
+        self.clear_terminal()
         print('Começando a captura de pacotes!')
         self._start_time = time.time()
 
@@ -104,43 +106,69 @@ class NetworkAnalyzer:
         self.sniffer.start()
 
     def stop_packet_capture(self):
+        self.clear_terminal()
         if self.sniffer is not None:
-            print('Captura de pacotes finalizado!')
             self._end_time = time.time()
             self.sniffer.stop()
             self.sniffer = None
+            print('Captura de pacotes finalizado!')
+            if not self.use_shortcuts:
+                choice = int(input('Quer usar os atalhos de comandos? Digite 1 para sim, ou 0 para não.'))
+                if choice == 1:
+                    self.use_shortcuts = 1
+                    self.show_commands()
+                else:
+                    print('Atalhos desativados.')
 
     def get_bandwidth(self):
+        self.clear_terminal()
         elapsed_time = self._end_time - self._start_time
-        quantidade_pacotes = self.get_packet_count()
+        quantidade_pacotes = len(self.captured_packets)
         bandwidth = quantidade_pacotes / elapsed_time
-        print(f"A largura de banda da rede é: {round(bandwidth, 2)} pacotes/segundo")
+        print('---------------------------------------------\n'
+            f"A largura de banda da rede é: {round(bandwidth, 2)} pacotes/segundos\n"
+            '---------------------------------------------'
+            )
 
     def get_packet_count(self):
-        return len(self.captured_packets)
+        self.clear_terminal()
+        print('---------------------------------------------\n'
+            f'A quantidade de pacotes capturados foram: {len(self.captured_packets)} pacotes.\n'
+            '---------------------------------------------')
 
     def get_protocol_statistics(self):
-        protocol_stats = {}
+        self.clear_terminal()
+        self.protocol_stats = {}
 
         for packet in self.captured_packets:
             protocol = packet.getlayer(0).name
-            if protocol in protocol_stats:
-                protocol_stats[protocol] += 1
+            if protocol in self.protocol_stats:
+                self.protocol_stats[protocol] += 1
             else:
-                protocol_stats[protocol] = 1
+                self.protocol_stats[protocol] = 1
+        print('---------------------------------------------\n'
+            f'Protocolos existentes durante a captura de pacotes{self.protocol_stats}\n'
+            '---------------------------------------------\n')
 
-        return protocol_stats
+    def identify_anomalies(self, limite_pacotes=100, janela=10):
+        self.clear_terminal()
+        current_time = time.time()
+        start_janela = current_time - janela
 
-    def identify_anomalies(self):
+        quantidade_pacotes = [packet for packet in self.captured_packets if packet.time >= start_janela]
 
-        # Implemente a lógica para identificar e destacar eventos anômalos
-        pass
+        if len(quantidade_pacotes) > limite_pacotes:
+            print("Evento anômalo detectado!")
+            print(f"Pacotes capturados no último intervalo de tempo: {len(quantidade_pacotes)}")
+        else:
+            print("Nenhum evento anômalo detectado.")
 
     def generate_report(self):
-        protocol_stats = self.get_protocol_statistics()
+        self.clear_terminal()
+        print('Preparando o gráfico.')
 
-        protocols = list(protocol_stats.keys())
-        count = list(protocol_stats.values())
+        protocols = list(self.protocol_stats.keys())
+        count = list(self.protocol_stats.values())
 
         plt.figure(figsize=(8, 6))
         plt.bar(protocols, count)
@@ -158,3 +186,73 @@ class NetworkAnalyzer:
     def store_data(self):
         # Armazenar os dados relevantes, como informações de pacotes capturados e estatísticas de tráfego
         pass
+
+    def get_ping(self):
+        self.clear_terminal()
+        packet = IP(dst="google.com") / ICMP()
+        reply = sr1(packet, timeout=1, verbose=False)
+        
+        if reply:
+            rtt = reply.time - packet.sent_time
+            print('---------------------------------------------\n'
+                f'O ping com o Google é de: {round(rtt * 1000, 2)} ms.\n'
+                '---------------------------------------------\n')
+        
+    def get_capture_duration(self):
+        self.clear_terminal()
+        if self._start_time != 0 and self._end_time != 0:
+            duration = self._end_time - self._start_time
+            print('---------------------------------------------\n'
+                f'A captura de pacotes durou {round(duration,2)} s.\n'
+                '---------------------------------------------\n')
+        else:
+            print('Não conseguimos calcular o tempo. Tente novamente!')
+
+    def clear_terminal(self):
+        os.system('cls' if os.name == 'nt' else 'clear')
+    
+    def show_commands(self):
+        if self.use_shortcuts == 1:
+            choice_command = int(input(f'Os atalhos a seguir estão disponiveis:\n'
+                f'1 - get_bandwidth(), Usado para calcular a largura de banda da rede.\n'
+                f'2 - get_packet_count(), Retorna a quantidade de pacotes.\n'
+                f'3 - get_protocol_statistics(), Retorna a estatisticas de protocolos.\n'
+                f'4 - identify_anomalies(), Identifica se existe alguam anomalia.\n'
+                f'5 - generate_report(), Gera um gráfico cm os protocolos utilizados.\n'
+                f'6 - get_ping(), Retorna o ping com o Google.\n'
+                f'7 - get_capture_duration(), Retorna a duração da captura de pacotes.\n'
+                f'E digite qualquer tecla para sair.\n'
+                ))
+            if choice_command == 1:
+                self.get_bandwidth()
+                self.show_commands()
+            if choice_command == 2:
+                self.get_packet_count()
+                self.show_commands()
+            if choice_command == 3:
+                self.get_protocol_statistics()
+                self.show_commands()
+            if choice_command == 4:
+                self.identify_anomalies()
+                self.show_commands()
+            if choice_command == 5:
+                self.generate_report()
+                self.show_commands()
+            if choice_command == 6:
+                self.get_ping()
+                self.show_commands()
+            if choice_command == 7:
+                self.get_capture_duration()
+                self.show_commands()
+            else:
+                print('Operação finalizada!')
+        else:
+            print('Os comandos a seguir estão disponiveis:\n'
+                f'get_bandwidth(), Usado para calcular a largura de banda da rede.\n'
+                f'get_packet_count(), Retorna a quantidade de pacotes.\n'
+                f'get_protocol_statistics(), Retorna a estatisticas de protocolos.\n'
+                f'identify_anomalies(), Identifica se existe alguam anomalia.\n'
+                f'generate_report(), Gera um gráfico cm os protocolos utilizados.\n'
+                f'get_ping(), Retorna o ping com o Google.\n'
+                f'get_capture_duration(), Retorna a duração da captura de pacotes.\n')
+            
