@@ -2,7 +2,7 @@
 
 ## Introdução
 
-Este código Python implementa uma aplicação simples de análise de rede, permitindo a captura de pacotes, cálculos de largura de banda, estatísticas de protocolos, identificação de anomalias, geração de relatórios gráficos, e algumas outras funcionalidades. A aplicação requer autenticação de usuários para acessar as funcionalidades.
+Este projeto foi desenvolvido como parte do curso de Orientação a Objetos em Python. A aplicação é um Analisador de Rede que oferece diversas funcionalidades, como a captura de pacotes, cálculos de largura de banda, estatísticas de protocolos, identificação de anomalias, geração de relatórios gráficos, e muito mais.
 
 ## Classes
 
